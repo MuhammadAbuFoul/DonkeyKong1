@@ -1,175 +1,218 @@
 #include "Mario.h"
+#include "Game.h"
 #include "Utils.h"
 #include <iostream>
+#include <windows.h>
 using namespace std;
 
-// Constructor: Initialize Mario's position
-Mario::Mario(Board& gameBoard, int startX, int startY)
-    : board(gameBoard), x(startX), y(startY), symbol(SYMBOL_MARIO),
-    currentState(WALKING), movingLeft(false), movingRight(false) {
+Mario::Mario(Board& gameBoard, Game& gameInstance, int startX, int startY,int startLives)
+    : board(gameBoard), game(gameInstance), x(startX), y(startY), symbol(SYMBOL_MARIO),
+    currentState(STANDING), movingLeft(false), movingRight(false),lives(startLives), fallStartY(startY), isFalling(false) 
+{
     adjustStartingPosition();
     draw();
 }
 
-// Adjust Mario's starting position
-void Mario::adjustStartingPosition() {
+void Mario::loseLife() { if (lives > 0)    lives--;  else if (lives == 0)  game.endGame(); }
+
+void Mario::adjustStartingPosition()
+{
     while (board.getCell(y, x) == SYMBOL_FLOOR_LEFT ||
         board.getCell(y, x) == SYMBOL_FLOOR_RIGHT ||
-        board.getCell(y, x) == SYMBOL_FLOOR_STRAIGHT) {
+        board.getCell(y, x) == SYMBOL_FLOOR_STRAIGHT)
+    {
         y--;
-        if (y < 0) {
+        if (y < 0) 
+        {
             y = 0;
             break;
         }
     }
 }
 
-// Render Mario at his current position
-void Mario::draw() {
-    gotoxy(x, y);
-    cout << symbol;
+void Mario::draw() 
+{
+    if (game.isColoredTheme)
+    {
+     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+        SetConsoleTextAttribute(hConsole, 2);
+        gotoxy(x, y);
+        cout << symbol;
+        SetConsoleTextAttribute(hConsole, 7);
+    }
+    else
+    {
+        gotoxy(x, y);
+        cout << symbol;
+    }
 }
 
-// Clear Mario from his current position
-void Mario::erase() {
-    restoreTile(x, y);
-    gotoxy(x, y);
-    cout << ' ';
+void Mario::erase() 
+{
+    char currentTile = board.getCell(y, x);
+     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (currentTile == SYMBOL_LADDER)
+    {
+
+        gotoxy(x, y);
+        if(game.isColoredTheme)
+            SetConsoleTextAttribute(hConsole, 3);
+        cout << SYMBOL_LADDER;  
+    }
+    else 
+    {
+        gotoxy(x, y);
+        cout << ' '; 
+    }
 }
 
-// Restore a ladder or floor tile
-void Mario::restoreTile(int oldX, int oldY) {
+void Mario::restoreTile(int oldX, int oldY) 
+{
     char tile = board.getCell(oldY, oldX);
-    if (isLadderTile(tile) || tile == SYMBOL_FLOOR_LEFT || tile == SYMBOL_FLOOR_RIGHT || tile == SYMBOL_FLOOR_STRAIGHT) {
+    if (isLadderTile(tile) || tile == SYMBOL_FLOOR_LEFT || tile == SYMBOL_FLOOR_RIGHT || tile == SYMBOL_FLOOR_STRAIGHT)
+    {
         gotoxy(oldX, oldY);
         cout << tile;
     }
 }
 
-// Validate if Mario can move to a target position
-bool Mario::canMoveTo(int newX, int newY) {
-    if (newX < 0 || newX >= COLS || newY < 0 || newY >= ROWS) {
-        return false;
-    }
-    char targetCell = board.getCell(newY, newX);
-    return targetCell == ' ' || targetCell == SYMBOL_LADDER;
-}
+bool Mario::canMoveTo(int newX, int newY) { return ::canMoveTo(board, newX, newY); }
 
-// Check if a tile is a ladder tile
-bool Mario::isLadderTile(char tile) const {
-    return tile == SYMBOL_LADDER;
-}
-
-// Check if Mario is on a floor
-bool Mario::isOnFloor() const {
-    char below = board.getCell(y + 1, x);
-    return below == SYMBOL_FLOOR_LEFT ||
-        below == SYMBOL_FLOOR_RIGHT ||
-        below == SYMBOL_FLOOR_STRAIGHT;
-}
-
-// Check if Mario is standing on a ladder
-bool Mario::isOnLadder() const {
-    char currentTile = board.getCell(y, x);
-    return currentTile == SYMBOL_LADDER;
-}
-
-// Check if Mario is at a boundary
-bool Mario::isAtBoundary(int newX) const {
+bool Mario::isAtBoundary(int newX) const { 
     char targetCell = board.getCell(y, newX);
     return targetCell == SYMBOL_BOUNDARY;
 }
 
-// Redraw the ladder tile when Mario moves off it
 void Mario::redrawLadder() {
     char below = board.getCell(y + 1, x);
-    if (isLadderTile(below)) {
-        gotoxy(x, y);
-        cout << SYMBOL_LADDER;
+    if (isLadderTile(below)) 
+    { gotoxy(x, y);
+      cout << SYMBOL_LADDER;
     }
 }
 
-// Update Mario's movement and handle falling
-void Mario::updateMovement() {
-    if (!isOnFloor() && !isOnLadder()) {
+void Mario::updateMovement() 
+{
+    if (!isOnFloor() && !isOnLadder()) 
+    {
+        if (!isFalling) {  
+            isFalling = true;
+            fallStartY = y;  
+        }
         erase();
-        y++;
+        y++; 
         draw();
         currentState = FALLING;
         return;
     }
 
-    if (movingLeft && canMoveTo(x - 1, y) && !isAtBoundary(x - 1)) {
+    if (isFalling && isOnFloor()) {
+        checkFallDamage();  
+        isFalling = false;  
+    }
+
+    char tileR = board.getCell(y, x + 1);         
+    if (isLadderTile(tileR) && currentState == WALKING_RIGHT) {
+        erase();
+        x += 2;
+        draw();
+
+    }
+    char tileL = board.getCell(y, x -1 );
+    if (isLadderTile(tileL) && currentState == WALKING_LEFT)  {
+        erase();
+        x -= 2;
+        draw();
+    }
+
+
+    else if (movingLeft &&  canMoveTo(x - 1, y)&& !isAtBoundary(x - 1)) {
         erase();
         x--;
         draw();
     }
-    else if (movingRight && canMoveTo(x + 1, y) && !isAtBoundary(x + 1)) {
+    else if (movingRight && canMoveTo(x + 1, y) && !isAtBoundary(x + 1))  {
         erase();
         x++;
         draw();
     }
+       game.checkVictoryCondition();
 }
 
-// Move Mario left
-void Mario::moveLeft() {
-    movingLeft = true;
-    movingRight = false;
-    currentState = WALKING;
+void Mario::checkFallDamage() 
+{
+    int fallDistance = fallStartY - y;
+    fallDistance *= -1;
+
+    if (fallDistance >= 5)  {
+        loseLife();  
+        game.restartStage(); 
+    }
 }
 
-// Move Mario right
-void Mario::moveRight() {
-    movingRight = true;
-    movingLeft = false;
-    currentState = WALKING;
-}
-
-// Stop Mario's movement
-void Mario::stay() {
-    movingLeft = false;
-    movingRight = false;
-}
-
-// Handle Mario's climbing or jumping
-void Mario::moveUp() {
+void Mario::moveUp() 
+{
     char above = board.getCell(y - 1, x);
+    char rightTile= board.getCell(y, x+1);
+    char leftTile = board.getCell(y, x-1);
 
-    if (isLadderTile(above)) {
-        climbLadder();
-    }
-    else if (isOnFloor()) {
-        performJump();
-    }
+    if (isLadderTile(above) || isLadderTile(rightTile) || isLadderTile(leftTile)) { climbLadder(); }
+    else if (isOnFloor()) { performJump(); } 
+    
 }
 
-// Perform ladder climbing logic
-void Mario::climbLadder() {
-    erase();
-    y -= 4;  // Skip the ceiling tiles above the ladder
-    draw();
-    currentState = CLIMBING;
-}
+void Mario::moveDown()
+{
+    char below = board.getCell(y + 2, x);
+    char belowToRight = board.getCell(y + 2, x + 1);
+    char belowToLeft = board.getCell(y + 2, x - 1);
 
-// Move Mario down
-void Mario::moveDown() {
-    char below = board.getCell(y + 1, x);
-
-    if (isLadderTile(below)) {
+    if (isLadderTile(below)){
         erase();
-        y++;
+        y += 3;
+        x++;
         draw();
         currentState = CLIMBING;
     }
+
+    else if (isLadderTile(belowToRight) || isLadderTile(belowToLeft)) {
+        erase();
+        y += 3;
+        draw();
+        currentState = CLIMBING;
+    }
+    
+
 }
 
-// Perform Mario's jumping logic
-void Mario::performJump() {
-    int jumpHeight = 2;
+void Mario::performJump()
+{
+    int jumpHeight = 2; 
+    char above1 = board.getCell(y - 1, x); 
+    char above2 = board.getCell(y - 2, x);
+
+    if (above1 == SYMBOL_FLOOR_LEFT || above1 == SYMBOL_FLOOR_RIGHT || above1 == SYMBOL_FLOOR_STRAIGHT || above1 == SYMBOL_BOUNDARY ) return;
+    
     if (y - jumpHeight >= 0) {
-        erase();
-        y -= jumpHeight;
-        draw();
-        currentState = JUMPING;
+        if (above2 == SYMBOL_FLOOR_LEFT || above2 == SYMBOL_FLOOR_RIGHT || above2 == SYMBOL_FLOOR_STRAIGHT || above2 == SYMBOL_LADDER || above2 == SYMBOL_BOUNDARY){
+            erase();
+            y--; 
+            draw();
+        }
+        else  {
+           erase();
+           y -= jumpHeight; 
+
+            if (currentState == WALKING_RIGHT) {
+                if (canMoveTo(x + 2, y)) { x += 2; } }
+            else if (currentState == WALKING_LEFT) 
+            {
+                if (canMoveTo(x - 2, y)) { x -= 2; }
+                 else if (currentState == STANDING) return;
+            }
+
+            draw(); 
+            currentState = JUMPING; 
+        }
     }
 }

@@ -1,7 +1,10 @@
 #include "Board.h"
+#include "Game.h"
 #include "Utils.h"
+
 #include <iostream>
 #include <cstring>
+#include<windows.h>
 
 using namespace std;
 
@@ -9,29 +12,80 @@ Board::Board() {
     resetBoard();
 }
 
-void Board::resetBoard() {
-    for (int i = 0; i < ROWS; ++i) {
+void Board::displayLives(int lives) {
+
+    if (game->isColoredTheme) {
+        HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE); 
+
+        SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
+        gotoxy(4, 2);
+        cout << "LIVES: ";
+
+
+        if (lives == 1) {
+            SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_INTENSITY);
+            cout << lives << " ";
+
+        }
+        else if (lives == 2) {
+            SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+            cout << lives << " ";
+
+        }
+        else {
+            SetConsoleTextAttribute(hConsole, FOREGROUND_GREEN | FOREGROUND_INTENSITY);
+            cout << lives << " ";
+
+        }
+
+        SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
+        cout.flush();
+
+    }
+    else {
+        {
+            gotoxy(4, 2);
+            cout << "LIVES: " << lives << " ";
+            cout.flush();
+        }
+    } 
+
+}
+
+void Board::resetBoard() 
+{
+    for (int i = 0; i < ROWS; ++i) 
+    {
         memcpy(currentBoard[i], originalBoard[i], COLS);
-        currentBoard[i][COLS] = '\0'; // Null-terminate each row
+        currentBoard[i][COLS] = '\0'; 
     }
 }
 
-void Board::displayBoard() {
-    for (int i = 0; i < ROWS; ++i) {
-        gotoxy(0, i); // Use `gotoxy` to position rows correctly
-        cout << currentBoard[i]; // Print the board row by row
+void Board::displayBoard() 
+{
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    for (int i = 0; i < ROWS; ++i) 
+    {
+        gotoxy(0, i);
+
+        for (int j = 0; j < COLS; ++j)
+        {
+            char cell = currentBoard[i][j];
+            if (game->isColoredTheme) 
+            {
+                  if (cell == SYMBOL_LADDER) SetConsoleTextAttribute(hConsole, 3);
+                else if (cell == SYMBOL_PAULINE) SetConsoleTextAttribute(hConsole, 2);
+                else if (cell == SYMBOL_DONKEY) SetConsoleTextAttribute(hConsole, 12);
+                else if (cell == SYMBOL_BOUNDARY) SetConsoleTextAttribute(hConsole, 50);
+                else if  (cell == SYMBOL_FLOOR_STRAIGHT ) SetConsoleTextAttribute(hConsole, 6);
+                else if (cell == SYMBOL_FLOOR_LEFT || cell == SYMBOL_FLOOR_RIGHT ) SetConsoleTextAttribute(hConsole,14);
+                else SetConsoleTextAttribute(hConsole, 7);
+            }
+            cout << cell;
+        }
     }
+
+    SetConsoleTextAttribute(hConsole, 7); 
 }
 
-char Board::getCell(int row, int col) const {
-    if (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
-        return currentBoard[row][col];
-    }
-    return '\0'; // Return null character for out-of-bounds access
-}
 
-void Board::setCell(int row, int col, char value) {
-    if (row >= 0 && row < ROWS && col >= 0 && col < COLS) {
-        currentBoard[row][col] = value;
-    }
-}

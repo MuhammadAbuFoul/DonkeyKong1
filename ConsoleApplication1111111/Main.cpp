@@ -1,8 +1,11 @@
+
+
 #include "Game.h"
 
 
-int main() {
+int main() 
+{
     Game game;
-    game.run();  // Start the game and show the menu
+    game.run();
     return 0;
 }
